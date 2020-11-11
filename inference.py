@@ -5,14 +5,30 @@ import tensorflow as tf
 import cv2
 import os
 
-def create_inferencr_file(boxes, confidence, image_path, threshold, h, w):
+PATH_TO_SAVED_MODEL = 'exported/my_mobilenet_best/saved_model'
+
+
+print('Loading model...', end='')
+start_time = time.time()
+
+# Load saved model and build the detection function
+detect_fn = tf.saved_model.load(PATH_TO_SAVED_MODEL)
+
+end_time = time.time()
+elapsed_time = end_time - start_time
+print('Done! Took {} seconds'.format(elapsed_time))  
+
+
+
+
+def create_inference_file(boxes, confidence, image_path, threshold, h, w):
     index = confidence>threshold
     confidence = confidence[index]
     boxes = boxes[index]
-
+    #     image_path=image_path.split('/')[1] #Se for rodar no augmentado, descomentar isso
     image_path=image_path.split('.')[0]+'.txt'
 
-    f = open(PATH_TO_INFERENCE_FILES+image_path,'w')
+    f = open(PATH_TO_INFERENCE_FILES+image_path,'w+')
     for i in range(len(confidence)):
         text = 'robot {} {} {} {} {}\n'.format(str(confidence[i]),
                                             int(boxes[i][1]*w),
@@ -23,80 +39,110 @@ def create_inferencr_file(boxes, confidence, image_path, threshold, h, w):
     f.close()
                             
 
-
-PATH_TO_SAVED_MODEL = 'exported/my_mobilenet' + "/saved_model"
-
 PATH_TO_INFERENCE_FILES = 'mAP/input/detection-results/'
+if not os.path.exists(PATH_TO_INFERENCE_FILES):
+    os.makedirs(PATH_TO_INFERENCE_FILES)
 
-print('Loading model...', end='')
-start_time = time.time()
 
-# Load saved model and build the detection function
-detect_fn = tf.saved_model.load(PATH_TO_SAVED_MODEL)
-
-end_time = time.time()
-elapsed_time = end_time - start_time
-print('Done! Took {} seconds'.format(elapsed_time))
-
-category_index = label_map_util.create_category_index_from_labelmap('label_dict.txt',
-                                                                    use_display_name=True)
+category_index = label_map_util.create_category_index_from_labelmap('/kaggle/input/larc2020dataset/label_dict.txt',use_display_name=True)
+import cv2
+import pandas as pd
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 import warnings
+import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')   # Suppress Matplotlib 
 
-IMAGE_PATHS = ['dataset/images/wolves_test_c_043.png']
+# Inferencia nas imagens normais
+IMAGE_PATH = 'dataset'
+data1 = pd.read_csv("test.csv")
+data2 = pd.read_csv("train.csv")
+data = pd.concat([data1,data2])
 
-n = len(os.listdir('dataset/images'))
+# Para rodar no augmentado, alterar e descomentar isso
+# IMAGE_PATH = '/kaggle/working/LARC-2020-augmentation/'
+# data = pd.read_csv("/kaggle/working/LARC-2020-augmentation/ground_truth.csv",names=['filename','width','height','class','xmin','ymin','xmax','ymax']) 
+
+unicos = pd.unique(data["filename"])
+
+
+n = len(unicos)
 i=0
 
-for image_path in os.listdir('dataset/images'):
+for image_path in unicos:
     i+=1
-
     # print('Running inference for {}... '.format(image_path), end='')
     t = time.time()
-    image_np = cv2.imread("dataset/images/"+image_path)
+    image_np = cv2.imread(IMAGE_PATH+image_path)
     image_np = cv2.cvtColor(image_np,cv2.COLOR_BGR2RGB)
     input_tensor = tf.convert_to_tensor(image_np)
     input_tensor = input_tensor[tf.newaxis, ...]
 
-    print(image_np.shape)
+#     print(image_np.shape)
     h = image_np.shape[0]
     w = image_np.shape[1]
 
     # input_tensor = np.expand_dims(image_np, 0)
     detections = detect_fn(input_tensor)
 
+
+
     # All outputs are batches tensors.
     # Convert to numpy arrays, and take index [0] to remove the batch dimension.
     # We're only interested in the first num_detections.
-    num_detections = int(detections.pop('num_detections'))
+
+    num_detections = int(tf.cast(detections.pop('num_detections'),tf.int32))
     detections = {key: value[0, :num_detections].numpy()
-                   for key, value in detections.items()}
+                    for key, value in detections.items()}
     detections['num_detections'] = num_detections
 
-    # detection_classes should be ints.
     detections['detection_classes'] = detections['detection_classes'].astype(np.int64)
 
     image_np_with_detections = image_np.copy()
 
     viz_utils.visualize_boxes_and_labels_on_image_array(
-          image_np_with_detections,
-          detections['detection_boxes'],
-          detections['detection_classes'],
-          detections['detection_scores'],
-          category_index,
-          use_normalized_coordinates=True,
-          max_boxes_to_draw=200,
-          min_score_thresh=.30,
-          agnostic_mode=False)
+           image_np_with_detections,
+           detections['detection_boxes'],
+           detections['detection_classes'],
+           detections['detection_scores'],
+           category_index,
+           use_normalized_coordinates=True,
+           max_boxes_to_draw=200,
+           min_score_thresh=.30,
+           agnostic_mode=False)
 
 
     print('tempo  {}/{} = {}'.format(i,n,str(time.time()-t)))
-    #cv2.imshow(image_path,image_np_with_detections)
-    create_inferencr_file(detections['detection_boxes'],detections['detection_scores'],image_path,0.35,h,w)
-    #cv2.waitKey(0)
+
+    create_inference_file(detections['detection_boxes'],detections['detection_scores'],image_path,0.35,h,w)
+#     #cv2.waitKey(0)
+
+
+
+# Cria ground-truth
+PATH_TO_GT_FILES = 'mAP/input/ground-truth/' 
+if not os.path.exists(PATH_TO_GT_FILES): 
+    os.makedirs(PATH_TO_GT_FILES)
+
+n=len(unicos)
+i=0
+for image_path in unicos: 
+    i+=1
+    print(i,n)
+    df = data[data.filename.isin([image_path])]
+    #     image_path=image_path.split('/')[1] #Se for rodar no augmentado descomentar isso
+    image_path=image_path.split('.')[0]+'.txt'
+    
+    f = open(PATH_TO_GT_FILES+image_path,'w+')
+      
+    for index, row in df.iterrows():
+        text = 'robot {} {} {} {}\n'.format(int(row.xmin),
+                                            int(row.ymin),
+                                            int(row.xmax),
+                                            int(row.ymax))
+        f.write(text)
+    f.close()
 
 
 

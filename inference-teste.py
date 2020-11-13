@@ -5,6 +5,7 @@ import tensorflow as tf
 import cv2
 import os
 from PIL import Image
+from matplotlib import image
  
 
 ## @brief Função auxiliar que calcula a área de um vetor de bounging boxes e retorna um vetor com a área de cada uma.
@@ -76,22 +77,20 @@ def create_inference_file(boxes, confidence, image_path, threshold, h, w):
         f.write(text)
     f.close()
 
+
 def create_inference_files(bb_list):
     for image, bb, h,w in bb_list:
         create_inference_file(bb['detection_boxes'], bb["detection_scores"], image,  0.45, h,w)
 
 
-
 def target(unicos, detect_fn, bb_list):
+    import tensorflow as tf
     print("comeco processo")
-
-   
+    print(detect_fn)
     
     IMAGE_PATH = '/home/ubuntu/test_images'
 
-
     i=0
-    n = len(unicos)
     for image_path in unicos:
         print(image_path,i)
 
@@ -111,7 +110,7 @@ def target(unicos, detect_fn, bb_list):
         #     print(image_np.shape)
         h = image_np.shape[0]
         w = image_np.shape[1]
-
+        print("shape")
         # input_tensor = np.expand_dims(image_np, 0)
         detections = detect_fn(input_tensor)
 
@@ -149,6 +148,7 @@ def target(unicos, detect_fn, bb_list):
         #cv2.waitKey(0)
         print("fim ",i)
 
+
 IMAGE_PATH = '/home/ubuntu/test_images'
 PATH_TO_INFERENCE_FILES = '/home/ubuntu/inference'
 if not os.path.exists(PATH_TO_INFERENCE_FILES):
@@ -166,8 +166,8 @@ import matplotlib.pyplot as plt
 from multiprocessing import Process
 from threading import Thread
 
+
 def main():
-    
 
     PATH_TO_SAVED_MODEL = '/home/ubuntu/unbeatables/dataset/LARC2020/exported/my_mobilenet_best/saved_model'
 
@@ -176,7 +176,6 @@ def main():
 
     import cv2
 
-
     # Load saved model and build the detection function
     detect_fn = tf.saved_model.load(PATH_TO_SAVED_MODEL)
     detect_fn2 = tf.saved_model.load(PATH_TO_SAVED_MODEL)
@@ -184,8 +183,6 @@ def main():
     end_time = time.time()
     elapsed_time = end_time - start_time
     print('Done! Took {} seconds'.format(elapsed_time)) 
-
-
  
     unicos = os.listdir("/home/ubuntu/test_images")
     print(len(unicos))
@@ -197,11 +194,10 @@ def main():
     start_time = time.clock()
     t=time.time()
 
-
     p = Process(target=target, args=(unicos[:int(len(unicos)/2)], detect_fn, bb_list,))
     p2 = Process(target=target, args=(unicos[int(len(unicos)/2):], detect_fn2, bb_list2,))
+    
     p.start()
-
     p2.start()
     p.join()
     p2.join()
@@ -211,7 +207,4 @@ def main():
     create_inference_files(bb_list)
 
 
-
 main()
-
-

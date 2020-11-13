@@ -13,6 +13,9 @@ import warnings
 import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')   # Suppress Matplotlib 
 
+tf.config.threading.set_intra_op_parallelism_threads(64)
+tf.config.threading.set_inter_op_parallelism_threads(64)
+
 
 ## @brief Função auxiliar que calcula a área de um vetor de bounging boxes e retorna um vetor com a área de cada uma.
 #  @param left_top Vetor de canto superio esquerdo das boxes.

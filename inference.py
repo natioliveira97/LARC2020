@@ -5,7 +5,7 @@ import tensorflow as tf
 import cv2
 import os
 
-PATH_TO_SAVED_MODEL = 'exported/my_mobilenet_best/saved_model'
+PATH_TO_SAVED_MODEL = "/home/ubuntu/unbeatables/dataset/LARC2020/exported/my_mobilenet_best/saved_model"
 
 
 print('Loading model...', end='')
@@ -39,12 +39,12 @@ def create_inference_file(boxes, confidence, image_path, threshold, h, w):
     f.close()
                             
 
-PATH_TO_INFERENCE_FILES = 'mAP/input/detection-results/'
+PATH_TO_INFERENCE_FILES = '/home/ubuntu/unbeatables/mAP/input/detection-results/'
 if not os.path.exists(PATH_TO_INFERENCE_FILES):
     os.makedirs(PATH_TO_INFERENCE_FILES)
 
 
-category_index = label_map_util.create_category_index_from_labelmap('/kaggle/input/larc2020dataset/label_dict.txt',use_display_name=True)
+category_index = label_map_util.create_category_index_from_labelmap('/home/ubuntu/unbeatables/dataset/LARC2020/label_dict.txt',use_display_name=True)
 import cv2
 import pandas as pd
 import numpy as np
@@ -55,14 +55,10 @@ import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')   # Suppress Matplotlib 
 
 # Inferencia nas imagens normais
-IMAGE_PATH = 'dataset'
-data1 = pd.read_csv("test.csv")
-data2 = pd.read_csv("train.csv")
-data = pd.concat([data1,data2])
 
 # Para rodar no augmentado, alterar e descomentar isso
-# IMAGE_PATH = '/kaggle/working/LARC-2020-augmentation/'
-# data = pd.read_csv("/kaggle/working/LARC-2020-augmentation/ground_truth.csv",names=['filename','width','height','class','xmin','ymin','xmax','ymax']) 
+IMAGE_PATH = '/home/ubuntu/unbeatables/dataset/LARC2020/augumented'
+data = pd.read_csv("/home/ubuntu/unbeatables/dataset/LARC2020/augumented/ground_truth.csv",names=['filename','width','height','class','xmin','ymin','xmax','ymax']) 
 
 unicos = pd.unique(data["filename"])
 
@@ -70,11 +66,14 @@ unicos = pd.unique(data["filename"])
 n = len(unicos)
 i=0
 
+bb_list = []
+
 for image_path in unicos:
+        
     i+=1
     # print('Running inference for {}... '.format(image_path), end='')
     t = time.time()
-    image_np = cv2.imread(IMAGE_PATH+image_path)
+    image_np = cv2.imread(IMAGE_PATH+'/' + image_path)
     image_np = cv2.cvtColor(image_np,cv2.COLOR_BGR2RGB)
     input_tensor = tf.convert_to_tensor(image_np)
     input_tensor = input_tensor[tf.newaxis, ...]
@@ -109,10 +108,12 @@ for image_path in unicos:
            category_index,
            use_normalized_coordinates=True,
            max_boxes_to_draw=200,
-           min_score_thresh=.30,
+           min_score_thresh=.40,
            agnostic_mode=False)
 
 
+    bb_list.append(detections['detection_boxes'])
+    
     print('tempo  {}/{} = {}'.format(i,n,str(time.time()-t)))
 
     create_inference_file(detections['detection_boxes'],detections['detection_scores'],image_path,0.35,h,w)
@@ -121,7 +122,7 @@ for image_path in unicos:
 
 
 # Cria ground-truth
-PATH_TO_GT_FILES = 'mAP/input/ground-truth/' 
+PATH_TO_GT_FILES = '/home/ubuntu/unbeatables/mAP/input/ground-truth/' 
 if not os.path.exists(PATH_TO_GT_FILES): 
     os.makedirs(PATH_TO_GT_FILES)
 
